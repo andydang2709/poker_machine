@@ -255,13 +255,17 @@ class PokerGame:
                 return "win"
 
         elif action == 'bet':
-            amount = player.pending_amount
-            if amount <= self.max_bet:
-                amount = self.max_bet - player.current_bet
-            else:
-                self.max_bet = amount
+            desired_total = player.pending_amount
+            additional_bet = desired_total - player.current_bet
 
-            actual_bet = player.place_bet(amount)
+            if additional_bet <= 0:
+                # Can't bet less than or equal to current
+                additional_bet = 0.0
+
+            if desired_total > self.max_bet:
+                self.max_bet = desired_total
+
+            actual_bet = player.place_bet(additional_bet)
             self.pot += actual_bet
 
             player.pending_action = None
