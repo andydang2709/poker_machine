@@ -47,12 +47,9 @@ def player_action(name: str, action: str, amount: Optional[float] = 0):
     game.set_player_action(name, action, amount)
 
     player = next((p for p in game.players if p.name == name), None)
-    if player:
-        player.has_acted = True
 
-    showdown_data = None  # 🛠 Create empty showdown_data first
+    showdown_data = None 
 
-    # 🛠 CALL play_betting_round() HERE!
     round_result = game.play_betting_round()
 
     # If the round_result is a dict, it means it's the showdown data
@@ -64,7 +61,7 @@ def player_action(name: str, action: str, amount: Optional[float] = 0):
     }
 
     if showdown_data:
-        response["showdown"] = showdown_data  # 🛠 Tell frontend showdown happened!
+        response["showdown"] = showdown_data
 
     return response
 
@@ -76,6 +73,5 @@ def showdown():
 
 @app.get("/next_hand")
 def next_hand():
-    game.start_game()
-    game.post_blinds()
+    game.start_new_hand()
     return game.game_state()
