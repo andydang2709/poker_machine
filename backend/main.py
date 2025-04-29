@@ -52,16 +52,30 @@ def player_action(name: str, action: str, amount: Optional[float] = 0):
 
     round_result = game.play_betting_round()
 
-    # If the round_result is a dict, it means it's the showdown data
-    if isinstance(round_result, dict):
-        showdown_data = round_result
-
     response = {
         "state": game.game_state()
     }
 
-    if showdown_data:
-        response["showdown"] = showdown_data
+    # 🛠 Handle win due to fold
+    if round_result == "win":
+        remaining = [p for p in game.players if not p.folded]
+        if remaining:
+            winner = remaining[0]
+            response["showdown"] = {
+                "board": game.community_cards,
+                "results": [{
+                    "name": winner.name,
+                    "hand": [str(c) for c in winner.hand],
+                    "hand_name": "Wins by Fold"
+                }],
+                "winners": [winner.name]
+            }
+
+    elif isinstance(round_result, dict):  # normal showdown
+        response["showdown"] = round_result
+
+    # if showdown_data:
+    #     response["showdown"] = showdown_data
 
     return response
 

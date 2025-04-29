@@ -373,6 +373,9 @@ class PokerGame:
         self.players = [p for p in self.players if p.bb > 0]
 
     def game_state(self):
+        small_blind_idx = (self.dealer_idx + 1) % len(self.players)
+        big_blind_idx = (self.dealer_idx + 2) % len(self.players)
+
         return {
             "pot": round(self.pot, 1),
             "community_cards": [str(card) for card in self.community_cards],
@@ -382,13 +385,16 @@ class PokerGame:
                     "bb": round(p.bb, 1),
                     "hand": [str(card) for card in p.hand],
                     "folded": p.folded,
-                    "is_all_in": p.is_all_in
+                    "is_all_in": p.is_all_in,
+                    "is_small_blind": idx == small_blind_idx,
+                    "is_big_blind": idx == big_blind_idx,
                 }
-                for p in self.players
+                for idx, p in enumerate(self.players)
             ],
             "current_stage": self.current_stage,
             "current_turn": self.players[self.current_turn].name if self.players else None,
         }
+
     
     def find_first_active_player(self):
         for idx, p in enumerate(self.players):
