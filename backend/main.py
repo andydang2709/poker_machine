@@ -21,7 +21,6 @@ game = PokerGame(["Andy", "Linh"])
 @app.get("/start")
 def start_game():
     game.start_game()
-    game.post_blinds()
     return game.game_state()
 
 @app.get("/state")
@@ -51,29 +50,27 @@ def player_action(name: str, action: str, amount: Optional[float] = 0):
     if player:
         player.has_acted = True
 
-    # 👇 Main logic
-    showdown_data = None
+    showdown_data = None  # 🛠 Create empty showdown_data first
 
-    if game.all_players_acted():
-        stage_result = game.advance_stage()
+    # 🛠 CALL play_betting_round() HERE!
+    round_result = game.play_betting_round()
 
-        if isinstance(stage_result, dict):  # if final_showdown returned a dict
-            showdown_data = stage_result
-    else:
-        game.next_turn()
+    # If the round_result is a dict, it means it's the showdown data
+    if isinstance(round_result, dict):
+        showdown_data = round_result
 
     response = {
         "state": game.game_state()
     }
 
     if showdown_data:
-        response["showdown"] = showdown_data  # ✅ tell frontend showdown happened
+        response["showdown"] = showdown_data  # 🛠 Tell frontend showdown happened!
 
     return response
 
 @app.get("/showdown")
 def showdown():
-    showdown_data = game.final_showdown()
+    showdown_data = game.showdown()
     game.remove_broke_players()
     return showdown_data
 

@@ -150,7 +150,9 @@ class PokerGame:
         self.deck = Deck()
         self.community_cards: List[Card] = []
         self.pot = 0.0
+        self.max_bet = 0.0
         self.round_number = 0
+        self.dealer_idx = 0
         self.current_turn = 0  # index of player whose turn it is
         self.current_stage = "preflop"  # or "flop", "turn", "river"
 
@@ -158,15 +160,22 @@ class PokerGame:
         self.deck = Deck()
         self.community_cards.clear()
         self.pot = 0.0
-        self.current_stage = "preflop"  # ✅ RESET THIS TOO
-        self.current_turn = 0           # ✅ OPTIONAL: reset turn
+        self.current_stage = "preflop"
+        self.current_turn = 0
+        self.max_bet = 0.0
+        self.dealer_idx = 0
+
         for player in self.players:
             player.reset()
+            player.bb = STARTING_BIG_BLINDS  # 🛠 ADD THIS LINE: reset player chips
 
     def start_game(self):
+        self.dealer_idx = (self.dealer_idx + 1) % len(self.players)
         self.reset_game()
         self.deal_hole_cards()
-        self.reset_actions()  # 🛠 ADD THIS to clear has_acted
+        self.post_blinds()
+        self.reset_actions()
+        self.current_turn = (self.dealer_idx + 1) % len(self.players)
 
     def deal_hole_cards(self):
         for player in self.players:
@@ -181,6 +190,7 @@ class PokerGame:
         big_blind = self.players[(self.round_number + 1) % len(self.players)]
         self.pot += small_blind.place_bet(0.5)
         self.pot += big_blind.place_bet(1)
+        self.max_bet = big_blind.current_bet
 
     def active_players(self):
         return [p for p in self.players if not p.folded]
@@ -206,14 +216,99 @@ class PokerGame:
             self.burn_and_deal(1)
             self.current_stage = "river"
         elif self.current_stage == "river":
-            return self.final_showdown()  # <- ⬅️ NEW
+            return self.showdown()
 
         self.reset_bets()
         self.reset_actions()
-        self.current_turn = self.find_first_active_player()
+        self.max_bet = 0.0
+        self.current_turn = (self.dealer_idx + 1) % len(self.players)
         return "continue"
 
-    def final_showdown(self):
+    def play_betting_round(self):
+        player = self.players[self.current_turn]
+
+        if player.folded or player.is_all_in:
+            self.next_turn()
+            return "waiting"
+
+        action = player.make_action(self.max_bet)
+
+        if action == 'fold':
+            player.fold()
+            if self.check_instant_win():
+                return "win"
+
+        elif action == 'bet':
+            amount = player.pending_amount
+            if amount <= self.max_bet:
+                amount = self.max_bet - player.current_bet
+            else:
+                self.max_bet = amount
+
+            actual_bet = player.place_bet(amount)
+            self.pot += actual_bet
+
+            player.pending_action = None
+            player.pending_amount = 0.0
+
+        elif action == 'call':
+            call_amount = self.max_bet - player.current_bet
+            print(f"[CALL] {player.name} attempting to call.")
+            print(f"Current Bet: {player.current_bet}, Max Bet: {self.max_bet}, Call Amount: {call_amount}, Stack (bb): {player.bb}")
+
+            if call_amount > 0:
+                actual_call = player.place_bet(call_amount)
+                self.pot += actual_call
+                print(f"[CALL] {player.name} places {actual_call} BB into the pot.")
+            else:
+                actual_call = 0
+                print(f"[CALL] {player.name} has already matched the max bet.")
+
+            player.current_bet = self.max_bet  # sync their current bet to table's max
+            player.pending_action = None
+            player.pending_amount = 0.0
+
+            print(f"[CALL COMPLETE] {player.name}: Current Bet = {player.current_bet}, Remaining BB = {player.bb}, Pot = {self.pot}\n")
+        
+        player.has_acted = True
+        
+        if self.betting_done():
+            return self.advance_stage()
+
+        self.next_turn()
+
+        return "waiting"
+
+    def next_turn(self):
+        active = self.active_players()
+        if active:
+            self.current_turn = (self.current_turn + 1) % len(self.players)
+
+    def betting_done(self):
+        active = self.active_players()
+        if not active:
+            return True
+        
+        max_bet = max(p.current_bet for p in active)
+        
+        return all(
+            (p.current_bet == max_bet or p.is_all_in) and p.has_acted
+            for p in active
+    )
+
+    def reset_bets(self):
+        for p in self.players:
+            p.current_bet = 0
+        # self.current_turn = 0  # back to first active player
+
+    def check_instant_win(self):
+        active = self.active_players()
+        if len(active) == 1:
+            active[0].bb += self.pot
+            return True
+        return False
+
+    def showdown(self):
         board = [str(card) for card in self.community_cards]
 
         best_score = (-1, [])
@@ -244,85 +339,11 @@ class PokerGame:
         for winner in winners:
             winner.bb += split_pot
 
-        # 🛑 DO NOT reset game yet
-        # Return results first
         return {
             "board": board,
             "results": results,
             "winners": winner_names
         }
-
-    def play_betting_round(self):
-        max_bet = max(p.current_bet for p in self.players)
-        player = self.players[self.current_turn]
-
-        if player.folded or player.is_all_in:
-            self.next_turn()
-            return "waiting"
-
-        action = player.make_action(max_bet)
-
-        if action == 'fold':
-            player.fold()
-            if self.check_instant_win():
-                return "win"
-        elif action == 'bet':
-            amount = player.pending_amount
-            raise_amount = amount - max_bet
-            if raise_amount < 1:
-                amount = max_bet - player.current_bet
-            else:
-                max_bet = amount
-            self.pot += player.place_bet(amount)
-        elif action == 'call':
-            call_amount = max_bet - player.current_bet
-            if call_amount > 0:
-                self.pot += player.place_bet(call_amount)
-
-        self.next_turn()
-
-        if self.betting_done():
-            return self.advance_stage()
-        return "waiting"
-
-    def next_turn(self):
-        active = self.active_players()
-        if active:
-            self.current_turn = (self.current_turn + 1) % len(self.players)
-
-    def betting_done(self):
-        active = self.active_players()
-        return all(p.current_bet == max(p.current_bet for p in active) or p.is_all_in for p in active)
-
-    def reset_bets(self):
-        for p in self.players:
-            p.current_bet = 0
-        self.current_turn = 0  # back to first active player
-
-    def check_instant_win(self):
-        active = self.active_players()
-        if len(active) == 1:
-            active[0].bb += self.pot
-            return True
-        return False
-
-    def showdown(self):
-        best_score, winners = (-1, []), []
-        for player in self.players:
-            if player.folded:
-                continue
-            combined = player.hand + self.community_cards
-            score, _ = HandEvaluator.evaluate_hand(combined)
-            if score > best_score:
-                best_score = score
-                winners = [player]
-            elif score == best_score:
-                winners.append(player)
-
-        split_pot = self.pot / len(winners)
-        for winner in winners:
-            winner.bb += split_pot
-        return [winner.name for winner in winners]
 
     def remove_broke_players(self):
         self.players = [p for p in self.players if p.bb > 0]
