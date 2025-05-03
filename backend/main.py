@@ -44,11 +44,16 @@ def deal_river():
 
 @app.post("/action")
 def player_action(name: str, action: str, amount: Optional[float] = 0):
+    if action == "bet" and amount <= 0:
+        return {
+            "error": "You cannot bet 0 or less BB."
+        }
+    
     game.set_player_action(name, action, amount)
 
-    player = next((p for p in game.players if p.name == name), None)
+    # player = next((p for p in game.players if p.name == name), None)
 
-    showdown_data = None 
+    # showdown_data = None 
 
     round_result = game.play_betting_round()
 

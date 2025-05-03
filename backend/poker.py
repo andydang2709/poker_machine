@@ -259,8 +259,10 @@ class PokerGame:
             additional_bet = desired_total - player.current_bet
 
             if additional_bet <= 0:
-                # Can't bet less than or equal to current
-                additional_bet = 0.0
+                # Invalid bet, skip this action
+                player.pending_action = None
+                player.pending_amount = 0.0
+                return "waiting"
 
             if desired_total > self.max_bet:
                 self.max_bet = desired_total
