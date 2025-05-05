@@ -93,5 +93,6 @@ async def showdown():
 async def next_hand():
     if game is None:
         raise HTTPException(status_code=400, detail="Game has not been started.")
+    game.remove_broke_players()
     game.start_new_hand()
     return game.game_state()

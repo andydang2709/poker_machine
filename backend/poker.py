@@ -192,6 +192,7 @@ class PokerGame:
         self.start_new_hand()
 
     def start_new_hand(self):
+        self.remove_broke_players()
         self.deck = Deck()
         self.community_cards.clear()
         self.pot = 0.0
