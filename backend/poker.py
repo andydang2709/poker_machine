@@ -255,6 +255,15 @@ class PokerGame:
         return "continue"
 
     def play_betting_round(self) -> Optional[Dict]:
+        self.remove_broke_players()
+        if len(self.players) == 1:
+            lone = self.players[0]
+            lone.bb += self.pot
+            self.pot = 0
+            return "win"
+        if self.current_turn >= len(self.players):
+            self.current_turn = 0
+            
         player = self.players[self.current_turn]
         if player.folded or player.is_all_in:
             self.next_turn()
