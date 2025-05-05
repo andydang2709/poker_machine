@@ -258,7 +258,7 @@ class PokerGame:
         # get the player whose turn it is
         player = self.players[self.current_turn]
 
-        # Skip folded or already all-in players
+        # Skip anyone who folded or is already all-in
         if player.folded or player.is_all_in:
             self.next_turn()
             return "waiting"
