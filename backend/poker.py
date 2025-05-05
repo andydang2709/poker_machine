@@ -192,7 +192,6 @@ class PokerGame:
         self.start_new_hand()
 
     def start_new_hand(self):
-        self.remove_broke_players()
         self.deck = Deck()
         self.community_cards.clear()
         self.pot = 0.0
@@ -256,10 +255,7 @@ class PokerGame:
         return "continue"
 
     def play_betting_round(self) -> Optional[Dict]:
-        # get the player whose turn it is
         player = self.players[self.current_turn]
-
-        # Skip anyone who folded or is already all-in
         if player.folded or player.is_all_in:
             self.next_turn()
             return "waiting"
@@ -268,59 +264,51 @@ class PokerGame:
 
         if action == 'fold':
             player.fold()
-            # if folding leaves only one active player, they win
             if self.check_instant_win():
                 return "win"
 
         elif action == 'bet':
             desired_total = player.pending_amount
             additional_bet = desired_total - player.current_bet
-
             if additional_bet <= 0:
-                # invalid bet, ignore
                 player.pending_action = None
                 player.pending_amount = 0.0
                 return "waiting"
-
             if desired_total > self.max_bet:
                 self.max_bet = desired_total
-
             actual_bet = player.place_bet(additional_bet)
             self.pot += actual_bet
             player.pending_action = None
             player.pending_amount = 0.0
 
         elif action == 'call':
-            # figure out how much is needed to call
+            # figure out how much they need to put in to call
             call_amount = self.max_bet - player.current_bet
             if call_amount > 0:
-                # place as much of that as they can (all-in if short)
+                # place_bet will do min(call_amount, player.bb)
                 actual_call = player.place_bet(call_amount)
                 self.pot += actual_call
-                # increment their bet by the amount they actually put in
+                # only increase their current_bet by what they actually paid
                 player.current_bet += actual_call
+            # if they run out, place_bet will flag them all-in automatically
                 player.pending_action = None
                 player.pending_amount = 0.0
 
         elif action == 'check':
-            # only legal if no extra bet is due
+            # Only allowed if no additional bet is required
             if player.current_bet == self.max_bet:
                 player.has_acted = True
             else:
-                # illegal check, ignore
+                # Invalid check, skip action
                 player.pending_action = None
                 player.pending_amount = 0.0
                 return "waiting"
 
-        # mark that they’ve acted if they bet or called
         if action in ['bet', 'call']:
             player.has_acted = True
 
-        # if everyone’s matched or all-in, move to next street
         if self.betting_done():
             return self.advance_stage()
-
-        # otherwise go to next turn
         self.next_turn()
         return "waiting"
 
