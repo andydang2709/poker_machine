@@ -1,10 +1,10 @@
-run = "uvicorn backend.main:app --host=0.0.0.0 --port=8000 --reload"
+run = "uvicorn backend.main:app --host=0.0.0.0 --port=8000"
 
 modules = ["python-3.12"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["python312Packages.fastapi", "python312Packages.uvicorn"]
+packages = ["python311Packages.ray", "python312Packages.fastapi", "python312Packages.uvicorn"]
 
 [[ports]]
 localPort = 8000
