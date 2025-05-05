@@ -9,7 +9,9 @@ RANK_VALUES = {rank: index for index, rank in enumerate(RANKS, start=2)}
 
 STARTING_BIG_BLINDS = 100
 
+
 class Card:
+
     def __init__(self, rank: str, suit: str):
         self.rank = rank
         self.suit = suit
@@ -17,7 +19,9 @@ class Card:
     def __str__(self):
         return f"{self.rank}{self.suit}"
 
+
 class Deck:
+
     def __init__(self):
         self.cards = [Card(rank, suit) for suit in SUITS for rank in RANKS]
         self.shuffle()
@@ -34,7 +38,9 @@ class Deck:
         if self.cards:
             self.cards.pop(0)
 
+
 class Participant(ABC):
+
     def __init__(self, name: str):
         self.name = name
         self.hand: List[Card] = []
@@ -55,7 +61,9 @@ class Participant(ABC):
     def make_action(self, max_bet: float) -> str:
         pass
 
+
 class Player(Participant):
+
     def __init__(self, name: str):
         super().__init__(name)
         self.bb = STARTING_BIG_BLINDS
@@ -85,10 +93,13 @@ class Player(Participant):
         self.pending_amount = 0.0
         self.has_acted = False
 
+
 class HandEvaluator:
+
     @staticmethod
     def evaluate_hand(cards: List[Card]) -> tuple:
-        values = sorted([RANK_VALUES[card.rank] for card in cards], reverse=True)
+        values = sorted([RANK_VALUES[card.rank] for card in cards],
+                        reverse=True)
         suits = [card.suit for card in cards]
         value_counts = Counter(values)
         suit_counts = Counter(suits)
@@ -107,7 +118,10 @@ class HandEvaluator:
             pair = HandEvaluator.get_rank_by_count(value_counts, 2)
             return (6, [three, pair]), "Full House"
         if is_flush:
-            flush_cards = [val for val, suit in sorted(zip(values, suits), reverse=True) if suit_counts[suit] >= 5]
+            flush_cards = [
+                val for val, suit in sorted(zip(values, suits), reverse=True)
+                if suit_counts[suit] >= 5
+            ]
             return (5, flush_cards[:5]), "Flush"
         if is_straight:
             return (4, [top_card]), "Straight"
@@ -143,6 +157,7 @@ class HandEvaluator:
     @staticmethod
     def get_kickers(counter: Counter, exclude: List[int]) -> List[int]:
         return sorted([k for k in counter if k not in exclude], reverse=True)
+
 
 class PokerGame:
     def __init__(self, 
@@ -234,7 +249,8 @@ class PokerGame:
         self.reset_actions()
         self.max_bet = 0.0
         self.current_turn = (self.dealer_idx + 1) % len(self.players)
-        while self.players[self.current_turn].folded or self.players[self.current_turn].is_all_in:
+        while self.players[self.current_turn].folded or self.players[
+                self.current_turn].is_all_in:
             self.current_turn = (self.current_turn + 1) % len(self.players)
         return "continue"
 
@@ -306,7 +322,8 @@ class PokerGame:
         if not active:
             return True
         max_bet = max(p.current_bet for p in active)
-        return all((p.current_bet == max_bet or p.is_all_in) and p.has_acted for p in active)
+        return all((p.current_bet == max_bet or p.is_all_in) and p.has_acted
+                   for p in active)
 
     def reset_bets(self):
         for p in self.players:
@@ -330,7 +347,11 @@ class PokerGame:
             combined = player.hand + self.community_cards
             score, hand_name = HandEvaluator.evaluate_hand(combined)
             hand = [str(card) for card in player.hand]
-            results.append({"name": player.name, "hand": hand, "hand_name": hand_name})
+            results.append({
+                "name": player.name,
+                "hand": hand,
+                "hand_name": hand_name
+            })
             if score > best_score:
                 best_score = score
                 winners = [player]
@@ -350,22 +371,22 @@ class PokerGame:
         small_blind_idx = (self.dealer_idx + 1) % len(self.players)
         big_blind_idx = (self.dealer_idx + 2) % len(self.players)
         return {
-            "pot": round(self.pot, 1),
+            "pot":
+            round(self.pot, 1),
             "community_cards": [str(card) for card in self.community_cards],
-            "players": [
-                {
-                    "name": p.name,
-                    "bb": round(p.bb, 1),
-                    "hand": [str(card) for card in p.hand],
-                    "folded": p.folded,
-                    "is_all_in": p.is_all_in,
-                    "is_small_blind": idx == small_blind_idx,
-                    "is_big_blind": idx == big_blind_idx,
-                }
-                for idx, p in enumerate(self.players)
-            ],
-            "current_stage": self.current_stage,
-            "current_turn": self.players[self.current_turn].name if self.players else None,
+            "players": [{
+                "name": p.name,
+                "bb": round(p.bb, 1),
+                "hand": [str(card) for card in p.hand],
+                "folded": p.folded,
+                "is_all_in": p.is_all_in,
+                "is_small_blind": idx == small_blind_idx,
+                "is_big_blind": idx == big_blind_idx,
+            } for idx, p in enumerate(self.players)],
+            "current_stage":
+            self.current_stage,
+            "current_turn":
+            self.players[self.current_turn].name if self.players else None,
         }
 
     def find_first_active_player(self) -> int:
