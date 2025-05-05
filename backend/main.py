@@ -19,11 +19,13 @@ game: Optional[PokerGame] = None
 
 class StartGameRequest(BaseModel):
     players: List[str]
+    sb: Optional[float] = 0.5    # small blind
+    bb: Optional[float] = 1.0    # big blind
 
 @app.post("/start")
 async def start_game(request: StartGameRequest):
     global game
-    game = PokerGame(request.players)
+    game = PokerGame(request.players, request.sb, request.bb)
     game.start_game()
     return game.game_state()
 

@@ -145,7 +145,10 @@ class HandEvaluator:
         return sorted([k for k in counter if k not in exclude], reverse=True)
 
 class PokerGame:
-    def __init__(self, player_names: List[str]):
+    def __init__(self, 
+                 player_names: List[str],
+                 small_blind_amount: float = 0.5,
+                 big_blind_amount: float = 1.0):
         self.players = [Player(name) for name in player_names]
         self.deck = Deck()
         self.community_cards: List[Card] = []
@@ -154,6 +157,8 @@ class PokerGame:
         self.dealer_idx = 0
         self.current_turn = 0
         self.current_stage = "preflop"
+        self.small_blind_amount = small_blind_amount
+        self.big_blind_amount = big_blind_amount
 
     def reset_game(self):
         self.deck = Deck()
@@ -194,11 +199,11 @@ class PokerGame:
         self.community_cards.extend(self.deck.deal(num))
 
     def post_blinds(self):
-        small_blind = self.players[(self.dealer_idx + 1) % len(self.players)]
-        big_blind = self.players[(self.dealer_idx + 2) % len(self.players)]
-        self.pot += small_blind.place_bet(0.5)
-        self.pot += big_blind.place_bet(1)
-        self.max_bet = big_blind.current_bet
+        sb_player = self.players[(self.dealer_idx + 1) % len(self.players)]
+        bb_player = self.players[(self.dealer_idx + 2) % len(self.players)]
+        self.pot += sb_player.place_bet(self.small_blind_amount)
+        self.pot += bb_player.place_bet(self.big_blind_amount)
+        self.max_bet = bb_player.current_bet
 
     def active_players(self) -> List[Player]:
         return [p for p in self.players if not p.folded]
