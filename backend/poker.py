@@ -152,8 +152,8 @@ class PokerGame:
         self.pot = 0.0
         self.max_bet = 0.0
         self.dealer_idx = 0
-        self.current_turn = 0  # index of player whose turn it is
-        self.current_stage = "preflop"  # or "flop", "turn", "river"
+        self.current_turn = 0
+        self.current_stage = "preflop"
 
     def reset_game(self):
         self.deck = Deck()
@@ -163,14 +163,13 @@ class PokerGame:
         self.current_turn = 0
         self.max_bet = 0.0
         self.dealer_idx = 0
-
         for player in self.players:
             player.reset()
-            player.bb = STARTING_BIG_BLINDS  # 🛠 ADD THIS LINE: reset player chips
+            player.bb = STARTING_BIG_BLINDS
 
     def start_game(self):
-        self.reset_game()  # this resets chips and everything
-        self.start_new_hand()  # this only resets the current hand
+        self.reset_game()
+        self.start_new_hand()
 
     def start_new_hand(self):
         self.deck = Deck()
@@ -178,12 +177,9 @@ class PokerGame:
         self.pot = 0.0
         self.current_stage = "preflop"
         self.max_bet = 0.0
-
         for player in self.players:
-            player.reset()  # 🎯 fully resets everything
-
+            player.reset()
         self.dealer_idx = (self.dealer_idx + 1) % len(self.players)
-
         self.deal_hole_cards()
         self.post_blinds()
         self.reset_actions()
@@ -204,7 +200,7 @@ class PokerGame:
         self.pot += big_blind.place_bet(1)
         self.max_bet = big_blind.current_bet
 
-    def active_players(self):
+    def active_players(self) -> List[Player]:
         return [p for p in self.players if not p.folded]
 
     def set_player_action(self, name: str, action: str, amount: float = 0):
@@ -229,20 +225,16 @@ class PokerGame:
             self.current_stage = "river"
         elif self.current_stage == "river":
             return self.showdown()
-
         self.reset_bets()
         self.reset_actions()
         self.max_bet = 0.0
-        
         self.current_turn = (self.dealer_idx + 1) % len(self.players)
         while self.players[self.current_turn].folded or self.players[self.current_turn].is_all_in:
             self.current_turn = (self.current_turn + 1) % len(self.players)
-        
         return "continue"
 
-    def play_betting_round(self):
+    def play_betting_round(self) -> Optional[Dict]:
         player = self.players[self.current_turn]
-
         if player.folded or player.is_all_in:
             self.next_turn()
             return "waiting"
@@ -257,127 +249,101 @@ class PokerGame:
         elif action == 'bet':
             desired_total = player.pending_amount
             additional_bet = desired_total - player.current_bet
-
             if additional_bet <= 0:
-                # Invalid bet, skip this action
                 player.pending_action = None
                 player.pending_amount = 0.0
                 return "waiting"
-
             if desired_total > self.max_bet:
                 self.max_bet = desired_total
-
             actual_bet = player.place_bet(additional_bet)
             self.pot += actual_bet
-
             player.pending_action = None
             player.pending_amount = 0.0
 
         elif action == 'call':
             call_amount = self.max_bet - player.current_bet
-
             if call_amount > 0:
                 actual_call = player.place_bet(call_amount)
                 self.pot += actual_call
-            else:
-                actual_call = 0
-
-            player.current_bet = self.max_bet  # sync their current bet to table's max
+            player.current_bet = self.max_bet
             player.pending_action = None
             player.pending_amount = 0.0
 
-        # 🛠 Set has_acted **ONLY if player performed bet or call**
+        elif action == 'check':
+            # Only allowed if no additional bet is required
+            if player.current_bet == self.max_bet:
+                player.has_acted = True
+            else:
+                # Invalid check, skip action
+                player.pending_action = None
+                player.pending_amount = 0.0
+                return "waiting"
+
         if action in ['bet', 'call']:
             player.has_acted = True
 
-        # 🛠 DEBUGGING (optional)
-        # print(f"[DEBUG] {player.name} has_acted={player.has_acted}, current_bet={player.current_bet}, max_bet={self.max_bet}")
-
         if self.betting_done():
             return self.advance_stage()
-
         self.next_turn()
-
         return "waiting"
 
     def next_turn(self):
-        active = self.active_players()
+        active = [p for p in self.players if not p.folded and not p.is_all_in]
         if not active:
             return
-        
         next_idx = (self.current_turn + 1) % len(self.players)
         while self.players[next_idx].folded or self.players[next_idx].is_all_in:
             next_idx = (next_idx + 1) % len(self.players)
         self.current_turn = next_idx
 
-    def betting_done(self):
+    def betting_done(self) -> bool:
         active = [p for p in self.players if not p.folded and not p.is_all_in]
         if not active:
             return True
-        
         max_bet = max(p.current_bet for p in active)
-        
-        return all(
-            (p.current_bet == max_bet or p.is_all_in) and p.has_acted
-            for p in active
-    )
+        return all((p.current_bet == max_bet or p.is_all_in) and p.has_acted for p in active)
 
     def reset_bets(self):
         for p in self.players:
             p.current_bet = 0
-        # self.current_turn = 0  # back to first active player
 
-    def check_instant_win(self):
+    def check_instant_win(self) -> bool:
         active = self.active_players()
         if len(active) == 1:
             active[0].bb += self.pot
             return True
         return False
 
-    def showdown(self):
+    def showdown(self) -> Dict:
         board = [str(card) for card in self.community_cards]
-
         best_score = (-1, [])
         winners = []
         results = []
-
         for player in self.players:
             if player.folded:
                 continue
             combined = player.hand + self.community_cards
             score, hand_name = HandEvaluator.evaluate_hand(combined)
             hand = [str(card) for card in player.hand]
-            results.append({
-                "name": player.name,
-                "hand": hand,
-                "hand_name": hand_name
-            })
-
+            results.append({"name": player.name, "hand": hand, "hand_name": hand_name})
             if score > best_score:
                 best_score = score
                 winners = [player]
             elif score == best_score:
                 winners.append(player)
-
-        winner_names = [winner.name for winner in winners]
+        winner_names = [w.name for w in winners]
         split_pot = self.pot / len(winners)
-
-        for winner in winners:
-            winner.bb += split_pot
+        for w in winners:
+            w.bb += split_pot
         self.pot = 0
-        return {
-            "board": board,
-            "results": results,
-            "winners": winner_names
-        }
+        return {"board": board, "results": results, "winners": winner_names}
 
     def remove_broke_players(self):
         self.players = [p for p in self.players if p.bb > 0]
 
-    def game_state(self):
+    def game_state(self) -> Dict:
         small_blind_idx = (self.dealer_idx + 1) % len(self.players)
         big_blind_idx = (self.dealer_idx + 2) % len(self.players)
-
         return {
             "pot": round(self.pot, 1),
             "community_cards": [str(card) for card in self.community_cards],
@@ -397,48 +363,8 @@ class PokerGame:
             "current_turn": self.players[self.current_turn].name if self.players else None,
         }
 
-    
-    def find_first_active_player(self):
+    def find_first_active_player(self) -> int:
         for idx, p in enumerate(self.players):
             if not p.folded and not p.is_all_in:
                 return idx
-        return 0  # fallback
-
-    def reset_bets(self):
-        for p in self.players:
-            p.current_bet = 0
-        self.current_turn = 0  # back to first active
-
-    def next_turn(self):
-        active = [p for p in self.players if not p.folded and not p.is_all_in]
-        if not active:
-            return  # all folded or all-in
-        current_player = self.players[self.current_turn]
-        next_idx = (self.current_turn + 1) % len(self.players)
-        while self.players[next_idx].folded or self.players[next_idx].is_all_in:
-            next_idx = (next_idx + 1) % len(self.players)
-        self.current_turn = next_idx
-
-    def check_round_end(self):
-        active = [p for p in self.players if not p.folded]
-
-        if not active:
-            return  # Everyone folded or all-in
-
-        max_bet = max(p.current_bet for p in active)
-
-        # If all active players have either called (matched highest bet) or are all-in
-        if all(p.folded or p.current_bet == max_bet or p.is_all_in for p in active):
-            self.advance_stage()
-
-    def reset_bets(self):
-        for p in self.players:
-            p.current_bet = 0
-        self.current_turn = 0  # back to first available player
-
-    def is_round_ended(self):
-        return self.current_stage in ["flop", "turn", "river", "showdown"]
-    
-    def all_players_acted(self):
-        active = [p for p in self.players if not p.folded and not p.is_all_in]
-        return all(p.has_acted for p in active)
+        return 0
