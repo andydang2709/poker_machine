@@ -291,13 +291,16 @@ class PokerGame:
             player.pending_amount = 0.0
 
         elif action == 'call':
+            # figure out how much is needed to call
             call_amount = self.max_bet - player.current_bet
             if call_amount > 0:
+                # place as much of that as they can (all-in if short)
                 actual_call = player.place_bet(call_amount)
                 self.pot += actual_call
-            player.current_bet = self.max_bet
-            player.pending_action = None
-            player.pending_amount = 0.0
+                # increment their bet by the amount they actually put in
+                player.current_bet += actual_call
+                player.pending_action = None
+                player.pending_amount = 0.0
 
         elif action == 'check':
             # only legal if no extra bet is due
